@@ -1,5 +1,5 @@
 # CarCity
-Игра с видом сверху.
+Игра с видом сверху (только на Windows).
 
 # Зависимости
 1. [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h)
