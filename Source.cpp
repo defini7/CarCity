@@ -1,7 +1,8 @@
-﻿#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 
-#include "Engine.h"
+#include "OpenGL_Basic.h"
 
+#include <iostream>
 #include <map>
 #include <fstream>
 
@@ -22,13 +23,33 @@ extern "C"
 #pragma comment(lib, "lua542/liblua54.a")
 #endif
 
+// Some useful structs
+struct vf3d
+{
+	float x;
+	float y;
+	float z;
+};
+
+struct vf2d
+{
+	float x;
+	float y;
+};
+
+struct vi2d
+{
+	int x;
+	int y;
+};
+
 /*
 * Camera only has a position
 * and could not be rotated
 */
 struct sCamera
 {
-	def::vf3d pos;
+	vf3d pos;
 };
 
 /*
@@ -37,7 +58,7 @@ struct sCamera
 */
 struct sPlayer
 {
-	def::vf2d pos;
+	vf2d pos;
 
 	float angle;
 	float acceleration;
@@ -71,7 +92,10 @@ enum TILES
 	CAR // keep it always at the bottom
 };
 
-class Example : public def::Poison
+// Pi constant to save time
+const double PI = 2.0 * acos(0.0);
+
+class Example : public def::OpenGL_Basic
 {
 public:
 	Example(lua_State* state, int world_width, int world_height)
@@ -83,7 +107,7 @@ public:
 	}
 
 protected:
-	bool Start() override
+	bool OnBeforeMainLoop() override
 	{
 		auto get_from_table = [&](const char* key)
 		{
@@ -132,7 +156,7 @@ protected:
 		return true;
 	}
 
-	bool Update() override
+	bool OnFrameUpdate() override
 	{
 		camera.pos.x = player.pos.x;
 		camera.pos.y = player.pos.y;
@@ -210,14 +234,14 @@ protected:
 
 		// Move player
 		if (GetKey(VK_LEFT).bHeld)
-			player.angle -= (float)def::PI;
+			player.angle -= (float)PI;
 
 		if (GetKey(VK_RIGHT).bHeld)
-			player.angle += (float)def::PI;
+			player.angle += (float)PI;
 
 		auto calculate_possible = [&](float& x, float& y)
 		{
-			float fInRadians = player.angle * (float)def::PI / 180.0f;
+			float fInRadians = player.angle * (float)PI / 180.0f;
 
 			x = sinf(fInRadians) * 0.1f;
 			y = cosf(fInRadians) * 0.1f;
@@ -299,16 +323,11 @@ protected:
 		return true;
 	}
 
-	void Destroy() override
-	{
-		glDisable(GL_TEXTURE_2D);
-	}
-
 private:
 	lua_State* L = nullptr;
 
 	std::map<int, sTile> tWorld;
-	def::vi2d vSelectedArea;
+	vi2d vSelectedArea;
 
 	GLuint textures[9];
 
@@ -469,7 +488,7 @@ private:
 		return nTextureId;
 	}
 
-	void DrawTile(float x, float y, float z, GLuint texture, float angle, def::vf3d top_left, def::vf3d top_right, def::vf3d bottom_right, def::vf3d bottom_left)
+	void DrawTile(float x, float y, float z, GLuint texture, float angle, vf3d top_left, vf3d top_right, vf3d bottom_right, vf3d bottom_left)
 	{
 		glTranslatef(x, y, z);
 
