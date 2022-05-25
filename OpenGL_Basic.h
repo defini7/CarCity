@@ -1,75 +1,26 @@
 #pragma once
 
+// include basic libraries to make OpenGL work on Windows
 #include <Windows.h>
-#include <iostream>
 #include <gl/GL.h>
 
 #pragma comment(lib, "opengl32.lib")
 
-#define HInstance() GetModuleHandle(NULL)
-
 namespace def
 {
+	// Struct that helps to handle state of each key
 	struct KeyState
 	{
 		bool bPressed;
 		bool bReleased;
 		bool bHeld;
 	};
-
-	struct vf3d
+	
+	class OpenGL_Basic
 	{
-		float x;
-		float y;
-		float z;
-	};
-
-	struct vf2d
-	{
-		float x;
-		float y;
-	};
-
-	struct vi2d
-	{
-		int x;
-		int y;
-
-		friend bool operator<(const vi2d& lhs, const vi2d& rhs)
-		{
-			return lhs.x < rhs.x && lhs.y < rhs.y;
-		}
-	};
-
-	const double PI = 2.0 * acos(0.0);
-
-	class Poison
-	{
-	public:
-		Poison()
-		{
-			sTitle = L"Poison Sample";
-			
-			bFullScreen = false;
-
-			fMouseX = 0.0f;
-			fMouseY = 0.0f;
-		}
-
-		virtual ~Poison()
-		{
-
-		}
-
-	public:
-		virtual bool Start() = 0;
-		virtual bool Update() = 0;
-		virtual void Destroy()
-		{
-			return;
-		}
-
 	private:
+
+		// We don't handle keyboard keys or mouse buttons here, because this method is static
 		static LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		{
 			switch (msg)
@@ -83,6 +34,7 @@ namespace def
 			return DefWindowProc(hWnd, msg, wParam, lParam);
 		}
 
+		// These methods do some OpenGL stuff for Windows
 		void EnableOpenGL(HWND hwnd, HDC* hDC, HGLRC* hRC)
 		{
 			PIXELFORMATDESCRIPTOR pfd;
@@ -118,14 +70,15 @@ namespace def
 		}
 
 	public:
-		bool Run(int screen_width, int screen_height, std::wstring title, bool full_screen = false)
+		virtual bool OnBeforeMainLoop() = 0;
+		virtual bool OnFrameUpdate() = 0;
+
+		bool Run(int screen_width, int screen_height, const wchar_t* sTitle, bool bFullScreen = false)
 		{
 			nScreenWidth = screen_width;
 			nScreenHeight = screen_height;
 
-			bFullScreen = full_screen;
-
-			sTitle = title;
+			// Prepare window
 
 			WNDCLASS wc;
 			wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -135,12 +88,12 @@ namespace def
 			wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 			wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);
 
-			wc.hIcon = LoadIcon(HInstance(), nullptr);
+			wc.hIcon = LoadIcon(GetModuleHandle(NULL), nullptr);
 
-			wc.lpszClassName = sTitle.c_str();
+			wc.lpszClassName = sTitle;
 			wc.lpszMenuName = nullptr;
 
-			wc.hInstance = HInstance();
+			wc.hInstance = GetModuleHandle(NULL);
 
 			wc.lpfnWndProc = WinProc;
 
@@ -174,8 +127,8 @@ namespace def
 				fTopLeftY = 0.0f;
 			}
 
-			hWnd = CreateWindowEx(dwExStyle, sTitle.c_str(), sTitle.c_str(), dwStyle,
-				fTopLeftX, fTopLeftY, nScreenWidth, nScreenHeight, nullptr, nullptr, HInstance(), nullptr);
+			hWnd = CreateWindowEx(dwExStyle, sTitle, sTitle, dwStyle,
+				fTopLeftX, fTopLeftY, nScreenWidth, nScreenHeight, nullptr, nullptr, GetModuleHandle(NULL), nullptr);
 
 			if (!hWnd)
 			{
@@ -185,17 +138,21 @@ namespace def
 
 			ShowWindow(hWnd, SW_SHOW);
 
+			// Prepare OpenGL
+
 			EnableOpenGL(hWnd, &hDC, &hRC);
 			
 			glEnable(GL_DEPTH_TEST);
 
 			glFrustum(-1, 1, -1, 1, 2, 80);
 
-			if (!Start())
+			if (!OnBeforeMainLoop())
 				return false;
 
 			for (int i = 0; i < 256; i++)
 				keys[i] = { false, false , false };
+
+			SetWindowText(hWnd, sTitle);
 
 			MSG msg = { 0 };
 			while (msg.message != WM_QUIT)
@@ -212,6 +169,7 @@ namespace def
 				}
 				else
 				{
+					// Handle state of each key
 					for (int i = 0; i < 256; i++)
 					{
 						keyNewState[i] = GetAsyncKeyState(i);
@@ -236,21 +194,12 @@ namespace def
 						keyOldState[i] = keyNewState[i];
 					}
 
-					POINT cursor;
-					GetCursorPos(&cursor);
-					ScreenToClient(hWnd, &cursor);
-
-					fMouseX = cursor.x;
-					fMouseY = cursor.y;
-
-					SetWindowText(hWnd, LPWSTR(sTitle.c_str()));
-
 					glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
 					glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 					glPushMatrix();
 
-					if (!Update())
+					if (!OnFrameUpdate())
 						return false;
 
 					glPopMatrix();
@@ -261,7 +210,6 @@ namespace def
 				}
 			}
 
-			Destroy();
 			DisableOpenGL(hWnd, hDC, hRC);
 		}
 
@@ -269,44 +217,17 @@ namespace def
 		int nScreenWidth;
 		int nScreenHeight;
 
-		float fMouseX;
-		float fMouseY;
-
 		KeyState keys[256];
 
 		short keyNewState[256]{ 0 };
 		short keyOldState[256]{ 0 };
 
-		std::wstring sTitle;
-
-		bool bFullScreen;
-
 		HWND hWnd;
 
 	public:
-		bool IsFocused()
-		{
-			return GetForegroundWindow() == hWnd;
-		}
-
 		KeyState GetKey(short key)
 		{
 			return keys[key];
-		}
-
-		float GetMouseX()
-		{
-			return fMouseX;
-		}
-
-		float GetMouseY()
-		{
-			return fMouseY;
-		}
-
-		vf2d GetMouse()
-		{
-			return vf2d(fMouseX, fMouseY);
 		}
 
 		int GetScreenWidth()
@@ -318,12 +239,5 @@ namespace def
 		{
 			return nScreenHeight;
 		}
-
-		vi2d GetScreenSize()
-		{
-			return vi2d(nScreenWidth, nScreenHeight);
-		}
-
 	};
-
 }
